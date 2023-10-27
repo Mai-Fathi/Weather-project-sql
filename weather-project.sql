@@ -1,8 +1,6 @@
 
-
         -- SILVER LAYER
-SELECT CAST(TIME AS TIME) AS extracted_time
-FROM WEATHERDATA;
+/*Creating a divided layer of the raw data to devide wind rain snow and temp on hourly basis*/
 
 CREATE VIEW  HourlyTemprature as
 
@@ -38,6 +36,7 @@ FROM SRC_WEATHER_DATA.WEATHER_DATA.WEATHERDATA;
 
 
         -- GOLD LAYER
+/*Creating a divided layer of the raw data to devide wind rain snow and temp on daily basis with aggregation for the day*/
 
 CREATE VIEW DailyTemprature AS
 SELECT    CAST(TIME AS DATE) AS Record_date 
@@ -75,14 +74,12 @@ GROUP BY Record_date;
 
 ------------------------------------------------------------------
 --- FIRST QUESTION WHICH IS THE HOTTEST SUMMER MONTH, each year 
-
-------USING RANK AND SUBQUERY
-
-select  
+/*to solve this one i used a window function to give a ranking for each month in each year using the avg temperature of  per month asc t0 get the hottest temp,adding a filter for the summer month only, afterwards getting the rank number 1 in the original query to present the max temp per month in each year in one result*/
+SELECT 
            RECORD_YEAR 
          , RECORD_MONTH
          , ROUND(AVG_TEMP,2) AS TEMP_EACH_YEAR 
-from (
+FROM (
     SELECT  avg(DAILYTEMPRATURE) AS AVG_TEMP
             , MONTHNAME(RECORD_DATE) AS RECORD_MONTH
             ,YEAR(RECORD_DATE) AS RECORD_YEAR
@@ -92,176 +89,143 @@ from (
     GROUP BY RECORD_MONTH, RECORD_YEAR
     ORDER BY RECORD_YEAR 
      ) 
-where rnk = 1
+WHERE rnk = 1
 ;
 
 
 -----  2 Q - WHICH WAS THE HOTTEST DAY IN SUMMER MONTH 
------ using rnk and subqueris 
-select  
+/*to solve this one i used a window function to give a ranking for each month in each year using the max temperature  per day desc to get the hottest temp,adding a filter for the summer month only, afterwards getting the rank number 1 in the original query to present the max temp per day in each year in one result*/
+SELECT 
            RECORD_YEAR
          , RECORD_DATE
          , ROUND(AVG_TEMP,2) AS TEMP_EACH_YEAR 
-from (
+FROM (
 SELECT   DAILYTEMPRATURE AS AVG_TEMP
         ,RECORD_DATE                         
         ,YEAR(RECORD_DATE) AS RECORD_YEAR
-        , ROW_NUMBER () over ( partition by year(record_date) order by DAILYTEMPRATURE desc ) as rnk
+        , ROW_NUMBER () over ( PARTITION BY year(record_date) ORDER BY DAILYTEMPRATURE DESC ) AS rnk
 FROM GOLD.DAILYTEMPRATURE
     WHERE MONTH(RECORD_DATE)  BETWEEN 6 AND 8
 ORDER BY RECORD_YEAR 
      ) 
-where rnk = 1
+WHERE rnk = 1
 ;
-
-
-
-
-
-
-SELECT * FROM SRC_WEATHER_DATA.GOLD.DAILYTEMPRATURE WHERE DAILYTEMPRATURE= 'NaN';
-
 ----------------------------------
 -- Q3  WHICH WAS THE COLDEST MONTH
-select  
-           RECORD_YEAR::varchar 
+/*to solve this one i used a window function to give a ranking for each month in each year using the avg temperature of  per month asc tp get the coldest temp,adding a filter for the winter month only, afterwards getting the rank number 1 in the original query to present the min temp per month in each year in one result*/
+SELECT 
+           RECORD_YEAR
          , RECORD_MONTH
          , ROUND(AVG_TEMP,2) AS TEMP_EACH_YEAR 
-from (
-SELECT  avg(DAILYTEMPRATURE) AS AVG_TEMP
-        , MONTHNAME(RECORD_DATE) AS RECORD_MONTH
+FROM (
+SELECT  AVG(DAILYTEMPRATURE) AS AVG_TEMP
+        ,MONTHNAME(RECORD_DATE) AS RECORD_MONTH
         ,YEAR(RECORD_DATE) AS RECORD_YEAR
-        , ROW_NUMBER () over ( partition by year(record_date) order by avg(DAILYTEMPRATURE) ) as rnk
+        ,ROW_NUMBER () over ( PARTITION BY year(record_date) order by AVG(DAILYTEMPRATURE) ) as rnk
 FROM GOLD.DAILYTEMPRATURE
     WHERE MONTH(RECORD_DATE)  IN (9,10,11,12,1,2)
 GROUP BY RECORD_MONTH, RECORD_YEAR
 ORDER BY RECORD_YEAR 
      ) 
-where rnk = 1
+WHERE rnk = 1
 ;
-
-
 -------------------------------
 ---- Q 4 COLDEST DAY IN WINTER 
+/*to solve this one i used a window function to give a ranking for each month in each year using the min temperature  per day asc, afterwards getting the rank number 1 in the original query to present the most cold day in each year in one result*/
 
-select  
-           RECORD_YEAR::varchar 
+SELECT  
+           RECORD_YEAR
          , RECORD_DATE
-         , ROUND(AVG_TEMP,2) AS TEMP_EACH_YEAR 
-from (
-SELECT  avg(DAILYTEMPRATURE) AS AVG_TEMP
-        ,RECORD_DATE                          --MONTHNAME(RECORD_DATE) AS RECORD_MONTH
+         , ROUND(MIN_TEMP,2) AS TEMP_EACH_YEAR 
+FROM(
+SELECT  min(DAILYTEMPRATURE) AS MIN_TEMP
+        ,RECORD_DATE                          
         ,YEAR(RECORD_DATE) AS RECORD_YEAR
-        , ROW_NUMBER () over ( partition by year(record_date) order by avg(DAILYTEMPRATURE) ) as rnk
+        ,ROW_NUMBER () over ( partition by year(record_date) order by min(DAILYTEMPRATURE) ) as rnk
 FROM GOLD.DAILYTEMPRATURE
     WHERE MONTH(RECORD_DATE) IN (9,10,11,12,1,2)
 GROUP BY RECORD_DATE
 ORDER BY  RECORD_YEAR
      ) 
-where rnk = 1
+WHERE rnk = 1
 ;
-
-
-
-
-
-
-
-
 -------------------------------------------------------------
 ------ Q5 THE WINDIEST MONTH EACH YEAR 
-select  
+/* to solve this one i used a window function to give a ranking for each month in each year using the avg amount of wind per month desc, afterwards getting the rank number 1 in the original query to present the maximum wind in each year in one result*/
+SELECT 
            WIND_YEAR
           ,WIND_MONTH
-         , ROUND(AVG(WIND_SPEED),2) AS WIND_EACH_MONTH 
-from (
+          ,ROUND(AVG(WIND_SPEED),2) AS WIND_EACH_MONTH 
+FROM(
 SELECT   
          MONTHNAME(RECORD_DATE) AS WIND_MONTH
         , YEAR(RECORD_DATE) AS WIND_YEAR
         , ROUND(AVG(DAILYWINDSPEED),2) AS WIND_SPEED
-        , ROW_NUMBER () over ( partition by year(record_date) order by AVG(DAILYWINDSPEED) DESC ) as rnk
+        , ROW_NUMBER () over ( PARTITION BY year(record_date) ORDER BY AVG(DAILYWINDSPEED) DESC ) as rnk
 FROM GOLD.DAILYWINDSPEED
 GROUP BY 1,2
      ) 
-where rnk = 1
+WHERE rnk = 1
 GROUP BY 1,2
 ORDER BY 1
 ;
-
-
-
-
-
 -------------------------- 
 ----- Q6 THE WINDIEST DAY OF WINTER AND AVG SPEED WIND OF THE YEAR
-with avg_year as (
-
+/* to solve this one i used a window function to give a ranking for each day in each year using the maximum of wind per day desc, afterwards getting the rank number 1 in the original query to present the day in each year and also getting the avg of wind for each year in one result*/
+WITH avg_year AS (
 SELECT
 YEAR(RECORD_DATE) AS Yearwind,
 ROUND(AVG(dailywindspeed), 2) AS avg_wind_year
 FROM SRC_WEATHER_DATA.GOLD.DAILYWINDSPEED
 GROUP BY YEAR(RECORD_DATE)
 ),
- windiest_day as(
+ windiest_day AS(
 SELECT  MAX(DAILYWINDSPEED) AS WIND_SPEED
-        ,RECORD_DATE                          --MONTHNAME(RECORD_DATE) AS RECORD_MONTH
+        ,RECORD_DATE                         
         ,YEAR(RECORD_DATE) AS RECORD_YEAR
-        , ROW_NUMBER () over ( partition by year(record_date) order by MAX(DAILYWINDSPEED) DESC ) as rnk
+        , ROW_NUMBER () over ( PARTITION year(record_date) ORDER BY MAX(DAILYWINDSPEED) DESC ) as rnk
 FROM GOLD.DAILYWINDSPEED 
-
-group by 2,3
-     )
-select  
-          RECORD_DATE as the_windiest_Day
-          , DAYNAME(RECORD_DATE) AS WINDIEST_DAY_NAME
-         , WIND_SPEED AS MAX_WINDSPEED_DAY
-         
-         , RECORD_YEAR
+GROUP BY 2,3   )
+SELECT  
+          RECORD_DATE AS the_windiest_Day
+         ,DAYNAME(RECORD_DATE) AS WINDIEST_DAY_NAME
+         ,WIND_SPEED AS MAX_WINDSPEED_DAY
+         ,RECORD_YEAR
          ,avg_year.avg_wind_year
-from avg_year
-inner join windiest_day
-on  avg_year.yearwind =windiest_day.record_year
-
-where windiest_day.rnk = 1
-         
-order by RECORD_YEAR
+FROM avg_year
+INNER JOIN windiest_day
+ON  avg_year.yearwind =windiest_day.record_year
+WHERE windiest_day.rnk = 1  
+ORDER BY RECORD_YEAR
 ;
-
-
-
 ---------------------------------------------------------------------
 ---- Q7 WHICH MONTH HAD THE MOST RAINFALL EACH YEAR
-select  
+/*to solve this one i used a window function to give a ranking for each month in each year using the sum amount of rain per month desc, afterwards getting the rank number 1 in the original query to present the maximum rainfall in each year in one result*/
+SELECT  
            RECORD_YEAR
          , RECORD_MONTH
          , ROUND(rain_fall,2) AS rain_EACH_YEAR 
-from (
+FROM(
 SELECT  sum(DAILYRAINFALL) AS rain_fall
         , MONTHNAME(RECORD_DATE) AS RECORD_MONTH
         ,YEAR(RECORD_DATE) AS RECORD_YEAR
         , ROW_NUMBER () over ( partition by year(record_date) order by sum(DAILYRAINFALL) DESC ) as rnk
 FROM GOLD.DAILYRAINFALL
 GROUP BY 3,2
---ORDER BY YEAR(RECORD_DATE) 
-     )    
+    )    
 where rnk = 1
---GROUP BY 1,2
---order by RECORD_YEAR
-
 ;
-select rain from SRC_WEATHER_DATA.WEATHER_DATA.WEATHERDATA where rain >0;
-select dailyrainfall from SRC_WEATHER_DATA.gold.daiLYRAINFALL where dailyrainfall>0;
 
-select hourlyrainfall from SRC_WEATHER_DATA.SILVER.HOURLYRAINFALL where hourlyrainfall>0;
 ---------------------------------------------------------------------
---- Q8 WHICH MONTH HAD THE MOST SNOWFALL AND EACH YEAR
-select  
+--- Q8 8. Which month had the mostsnowfall each year?
+/* to solve this one i used a window function to give a ranking for each month in each year using the sum amount of snow per month desc, afterwards getting the rank number 1 in the original query to present the maximum snowfall in each year in one result  */
+SELECT 
            RECORD_YEAR
          , month
          , SNOW_FALL AS SNOW_EACH_YEAR 
-from (
+FROM (
 SELECT  sum(DAILYSNOWFALL) AS SNOW_FALL
-        ,month(RECORD_DATE)  as month                        --MONTHNAME(RECORD_DATE) AS RECORD_MONTH
+        ,month(RECORD_DATE)  as month                        
         ,YEAR(RECORD_DATE) AS RECORD_YEAR
         , ROW_NUMBER () over ( partition by year(record_date) order by sum(DAILYSNOWFALL) DESC ) as rnk
 FROM GOLD.DAILYSNOWFALL
@@ -269,93 +233,85 @@ FROM GOLD.DAILYSNOWFALL
 GROUP BY 3,2
 ORDER BY 3
      ) 
-where rnk = 1
+WHERE rnk = 1
 ;
-
-
 ----------------------------------------------------------------------------
------ Q9 Which date marked the start of spring each year
-select * 
-from SRC_WEATHER_DATA.GOLD.DAILYTEMPRATURE order by record_date ;
-
-
-
-with SPRING_DATES as (
-    select  
+----- Q9 Which date marked the start of spring each year?
+/*to solve this question */
+/*Spring will arrive after 7 consecutive days with spring temperatures. Spring temperature is daily mean temperature above 0.0°C, but not yet for 7 consecutive days. 15 February is set as the earliest allowed date for spring arrival. The latest date for spring arrival is 31 July
+-- to calculate the spring start based on that definition, i used window funtion that selects the min temperature of 8 consecutive days in a subquery, then on that result i wanted to apply the filer of the days range and if that temp is >0 afterwards applying another window function to give a rank for each 8th day that found within the filter and for each year, then in the original query i retrived only the days that got a rank of 1 */
+WITH SPRING_DATES AS (
+SELECT  
              
-              RECORD_DATE
-              , ROW_NUMBER () OVER ( PARTITION BY YEAR(RECORD_DATE) ORDER BY RECORD_DATE ) AS spring_start_date
-              , temp_spring
-             
-    from (
-            SELECT  
-                    RECORD_DATE ,DAILYTEMPRATURE  ,                       
-                    
-                     min(DAILYTEMPRATURE) over ( order by RECORD_DATE  ROWS BETWEEN 7 preceding and CURRENT ROW) as temp_spring
-            FROM GOLD.DAILYTEMPRATURE
-            order by record_date
-    
-         ) 
-         where  to_char(record_date, 'MM-DD' ) between '02-15' and '07-31' 
- and temp_spring > 0.0
-)
+        RECORD_DATE
+        ,ROW_NUMBER () OVER ( PARTITION BY YEAR(RECORD_DATE) ORDER BY RECORD_DATE ) AS spring_start_date
+        ,temp_spring  
+FROM (
+        SELECT  
+            RECORD_DATE ,DAILYTEMPRATURE  ,                       
+            min(DAILYTEMPRATURE) over( order by RECORD_DATE  ROWS BETWEEN 7 preceding and CURRENT ROW) as temp_spring
+        FROM GOLD.DAILYTEMPRATURE
+        ORDER BY record_date
+      ) 
+WHERE  to_char(record_date, 'MM-DD' ) BETWEEN '02-15' AND '07-31' 
+AND temp_spring > 0.0)
 
-select record_date AS SPRING_START_DATE
-from SPRING_DATES
-where spring_start_date=1 ;
-
-
-
-
+SELECT record_date AS SPRING_START_DATE
+FROM SPRING_DATES
+WHERE spring_start_date=1 ;
 
 -------------------------------------------------------------
-------------------------------------------------------------
---- Q10  
-with rainn as (
-select year(record_date) as rain_year, count(*) as rain_count
-from SRC_WEATHER_DATA.GOLD.DAILYRAINFALL
-where dailyrainfall >10
-group by rain_year order by rain_count desc ----2012= 15, 2011 = 8
+--- Q10 - Which year saw the most weather anomalies? 
+/* to solve this question i created a cte for each anomaly that calculates the count days of anomalies per year, i also created a cte that gets the list of the years only so i can left join on that cte the rest of the anomalies and compare the results, in the original query i presented the sum of all the anomalies for each year, ordered by that sum desc and limiting 1 to get the most anomaly year*/
+
+WITH rainn AS (
+SELECT year(record_date) AS rain_year, count(*) AS rain_count
+FROM SRC_WEATHER_DATA.GOLD.DAILYRAINFALL
+WHERE dailyrainfall >10
+GROUP BY rain_year ORDER BY rain_count DESC
 ),
 
- temperatue as (
-select year(record_date) as temp_year, count(*) as temp_count
-from SRC_WEATHER_DATA.GOLD.DAILYSNOWFALL
-where dailysnowfall >30
-group by snow_year order by snow_count desc -- 2012, 2011=1, 2010, 2003
+ temperatue AS (
+SELECT year(record_date) AS temp_year, count(*) AS temp_count
+FROM SRC_WEATHER_DATA.GOLD.DAILYTEMPRATURE
+WHERE dailytemprature >28
+GROUP BY temp_year ORDER BY temp_count DESC
 ),
 
- snoww as (
-select year(record_date) as snow_year, count(*) as snow_count
-from SRC_WEATHER_DATA.GOLD.DAILYSNOWFALL
-where dailysnowfall >30
-group by snow_year order by snow_count desc -- 2012, 2011=1, 2010, 2003
+ snoww AS (
+SELECT year(record_date) AS snow_year, count(*) AS snow_count
+FROM SRC_WEATHER_DATA.GOLD.DAILYSNOWFALL
+WHERE dailysnowfall >30
+GROUP BY snow_year ORDER BY snow_count DESC 
 ),
 
- windd as (
-select year(record_date) wind_year, count(*) as wind_count
-from SRC_WEATHER_DATA.SILVER.HOURLYWINDSPEED where hourlywindspeed >60
-group by wind_year order by wind_count desc ), ---- 2007,2011= 5
+ windd AS (
+SELECT year(record_date) wind_year, count(*) AS wind_count
+FROM SRC_WEATHER_DATA.SILVER.HOURLYWINDSPEED WHERE hourlywindspeed >60
+GROUP BY wind_year ORDER BY wind_count DESC ), 
 
- years as (
- select distinct year (record_date) as year_anomaly  from SRC_WEATHER_DATA.GOLD.DAILYRAINFALL
+ years AS (
+ SELECT DISTINCT year (record_date) AS year_anomaly  FROM SRC_WEATHER_DATA.GOLD.DAILYRAINFALL
  )
 
-select   year_anomaly
-        ,coalesce (rainn.rain_count,0) as rain
-        ,coalesce(windd.wind_count,0) as wind
-        ,coalesce(snoww.snow_count,0) as snow
-       , sum(coalesce (rainn.rain_count,0) + coalesce(windd.wind_count,0) + coalesce(snoww.snow_count,0)) as summm
+SELECT   year_anomaly
+        ,coalesce (rainn.rain_count,0) AS rain
+        ,coalesce(windd.wind_count,0) AS wind
+        ,coalesce(snoww.snow_count,0) AS snow
+        ,coalesce (temperatue.temp_count,0) AS temp
+       , sum(coalesce (rainn.rain_count,0) + coalesce(windd.wind_count,0) + coalesce(snoww.snow_count,0) +coalesce (temperatue.temp_count,0)) AS summm
          
-from years
-left join rainn
-on year_anomaly=rainn.rain_year
-left join snoww
-on year_anomaly = snoww.snow_year
-left join windd 
-on  year_anomaly=windd.wind_year
-group by 1,2,3,4
-order by summm desc
-limit 1
+FROM years
+LEFT JOIN rainn
+ON year_anomaly=rainn.rain_year
+LEFT JOIN snoww
+ON year_anomaly = snoww.snow_year
+LEFT JOIN windd 
+ON  year_anomaly=windd.wind_year
+LEFT JOIN temperatue 
+ON year_anomaly = temperatue.temp_year
+GROUP BY 1,2,3,4,5
+ORDER BY summm DESC
+LIMIT 1
  ;
 
